@@ -1,0 +1,1 @@
+iscsi_targets=( "<TARGET IQN>|<TARGET USER>:<TARGET PASS>@<TARGET HOST>:<PORT>" )

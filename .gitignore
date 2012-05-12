@@ -1,0 +1,6 @@
+.DS*
+*.old
+*.sqlite
+.shfclirc
+scr/*
+_*

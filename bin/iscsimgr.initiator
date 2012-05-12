@@ -1,0 +1,1 @@
+iscsi_initiator="<INITIATOR USER>:<INITIATOR PASS>@<INITIATOR IQN>"

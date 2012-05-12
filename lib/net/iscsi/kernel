@@ -1,0 +1,122 @@
+
+function net/iscsi/adm() {
+  if test $# -lt 6 ; then
+    return 1
+  fi
+  local _mode=${1}
+  local _portal=${2}
+  local _iqn=${3}
+  local _op=${4}
+  local _name=${5}
+  local _value=${6}
+  local _v=${7:-true}
+
+  echo "[${_op}] ${_name} "
+  if ${_v} ; then
+    ${net_iscsi} -m ${_mode} -p ${_portal} -T ${_iqn} -o ${_op} -n ${_name} -v ${_value}
+  else
+    ${net_iscsi} -m ${_mode} -p ${_portal} -T ${_iqn} -o ${_op} -n ${_name} -v ${_value} &> /dev/null
+  fi
+  if failed $? ; then $failure ; fi
+}
+
+function net/iscsi/discovery() {
+  if test $# -lt 2 ; then
+    return 1
+  fi
+  local _iqn=${1}
+  local _host=${2}
+  local _port=${3:-3260}
+  # iscsiadm -d 8 -m discovery -t st -p ${_host}:${_port}
+  ${net_iscsi} -m discovery -t st -p ${_host}:${_port}
+  if test $? -gt 0 ; then
+    echo ""
+    echo "${_iqn}"
+    echo "------------------------------------------"
+    echo "FAILED"
+    # iscsiadm -d 8 -m discovery -t st -p ${_host}:${_port}
+    echo "------------------------------------------"
+    echo ""
+  fi
+}
+
+function net/iscsi/init() {
+  if test $# -lt 7 ; then
+    return 1
+  fi
+  local _ini_user=${1}
+  local _ini_pass=${2}
+  local _host=${3}
+  local _port=${4}
+  local _iqn=${5}
+  local _user_in=${6}
+  local _pass_in=${7}
+  local _b=${8:-false}
+  local _l=${9:-false}
+
+  local _mode="node"
+  local _name=""
+  local _op=""
+  local _ret=0
+
+  echo ""
+  echo ""
+  echo "iSCSI Init"
+  echo "------------------------------------------"
+  echo "Target IQN: ${_iqn}"
+  echo "Target Host: ${_host}:${_port}"
+  # echo "Target User: ${_user_in}:${_pass_in}"
+  # echo "Initiator User: ${_ini_user}:${_ini_pass}"
+  echo ""
+
+  ###
+  # net/iscsi/discovery ${_host} ${_port}
+
+  ###
+  local _name="node.session.auth.username_in"
+  local _op="new"
+  net/iscsi/adm ${_mode} "${_host}:${_port}" ${_iqn} ${_op} ${_name} ${_user_in}
+
+  ###
+  _name="node.session.auth.username_in"
+  _op="update"
+  net/iscsi/adm ${_mode} "${_host}:${_port}" ${_iqn} ${_op} ${_name} ${_user_in}
+
+  ###
+  _name="node.session.auth.password_in"
+  _op="update"
+  net/iscsi/adm ${_mode} "${_host}:${_port}" ${_iqn} ${_op} ${_name} ${_pass_in}
+
+  ###
+  _name="node.session.auth.username"
+  _op="update"
+  net/iscsi/adm ${_mode} "${_host}:${_port}" ${_iqn} ${_op} ${_name} ${_ini_user}
+
+  ###
+  _name="node.session.auth.password"
+  _op="update"
+  net/iscsi/adm ${_mode} "${_host}:${_port}" ${_iqn} ${_op} ${_name} ${_ini_pass}
+
+  ###
+  _name="node.startup"
+  _op="update"
+  local _start="automatic"
+  if ${_b} ; then
+    _start="onboot"
+  fi
+  net/iscsi/adm ${_mode} "${_host}:${_port}" ${_iqn} ${_op} ${_name} ${_start}
+
+  ###
+  if ${_l} ; then
+    ${net_iscsi} -m ${_mode} -p ${_host}:${_port} -T ${_iqn} -l
+  fi
+}
+
+function net/iscsi/login() {
+  # iscsiadm -d 8 -m node -L all
+  ${net_iscsi} -m node -L all
+}
+
+function net/iscsi/logout() {
+  ${net_iscsi} -m node -U all
+}

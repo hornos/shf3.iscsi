@@ -1,0 +1,102 @@
+#!/bin/bash
+source $(dirname ${BASH_SOURCE})/../../shf3/lib/header
+include ${HOME}/shf3.iscsi/lib
+import gui
+import net/iscsi
+
+function help/iscsimgr() {
+  cat << EOF
+Usage: ${gbn} options
+              -i initiator
+              -t targets
+              -l - login
+              -u - logout
+              -d - discovery
+              -c - clean
+              -b - onboot
+EOF
+  exit 1
+}
+
+_etc="/etc/iscsi/nodes"
+
+_i="./initiator"
+_t="./targets"
+_u=false
+_l=false
+_d=false
+_c=false
+_b=false
+
+while getopts buldchi:t: o; do
+  case "$o" in
+    i) _i=$OPTARG;;
+    t) _t=$OPTARG;;
+    u) _u=true;;
+    l) _l=true;;
+    d) _d=true;;
+    c) _c=true;;
+    b) _b=true;;
+    h) help/iscsimgr;;
+  esac
+done
+
+### main
+if ${_u} ; then
+  answer "ISCSI Logout?"
+  if failed $? ; then exit 1 ; fi
+
+  net/iscsi/logout
+  exit $?
+fi
+
+if ${_l} ; then
+  answer "ISCSI Login?"
+  if failed $? ; then exit 1 ; fi
+
+  net/iscsi/login
+  exit $?
+fi
+
+for j in "${_i}" "${_t}" ; do
+  if ! test -r "${_i}" ; then
+    msg "Target not found: ${j}"
+    exit 1
+  fi
+  source "${j}"
+done
+
+
+# initiator
+ini_acc=$(field "${iscsi_initiator}" 1 "@")
+ini_iqn=$(field "${iscsi_initiator}" 2 "@")
+ini_user=$(field "${ini_acc}" 1 ":")
+ini_pass=$(field "${ini_acc}" 2 ":")
+
+# targets
+for t in ${iscsi_targets[@]} ; do
+  t_iqn=$(field "${t}" 1 "|")
+  t_acc=$(field "${t}" 2 "|")
+  t_acc1=$(field "${t_acc}" 1 "@")
+  t_acc2=$(field "${t_acc}" 2 "@")
+  t_user=$(field "${t_acc1}" 1 ":")
+  t_pass=$(field "${t_acc1}" 2 ":")
+  t_host=$(field "${t_acc2}" 1 ":")
+  t_port=$(field "${t_acc2}" 2 ":")
+
+  if ${_d} ; then
+    answer "Discover ${t_iqn}?"
+    if failed $? ; then exit 1 ; fi
+
+    net/iscsi/discovery ${t_iqn} ${t_host} ${t_port}
+  else
+    answer "Initialize ${t_iqn}?"
+    if failed $? ; then exit 1 ; fi
+
+    if ${_c} ; then
+      rm -fR "${_etc}/${t_iqn}"
+    fi
+    net/iscsi/init ${ini_user} ${ini_pass} ${t_host} ${t_port} ${t_iqn} ${t_user} ${t_pass} ${_b}
+  fi
+  sleep 2
+done
